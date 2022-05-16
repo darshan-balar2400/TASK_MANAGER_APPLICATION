@@ -5,6 +5,10 @@ const Auth = require("../Authentication/Auth");
 const multer = require("multer");
 const sharp = require("sharp");
 
+route.get("/",(req,res) => {
+    res.send("Welcome to task manager application");
+});
+
 // ------------------------------- CREATE THE USER --------------------------------
 route.post("/users",async(req,res) => {
     try{
