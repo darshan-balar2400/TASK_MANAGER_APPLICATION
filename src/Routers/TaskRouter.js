@@ -25,33 +25,67 @@ route.post("/tasks", Auth, async (req, res) => {
         const saveTask = await newTask.save();
 
         // update user with task
-        user.tasks = user.tasks.concat(saveTask._id);
-        // save the use
-        await new User(user).save();
-        res.status(200).send(saveTask);
-    }
-    catch (e) {
-        res.status(500).send(e);
-    }
-});
-
-// ------------------------ GET THE TASKS ----------------------------------
-route.get("/tasks", Auth, async (req, res) => {
-    try {
-        const user = req.user;
-        // get the tasks by using its owner property
-        const getTasks = await Task.find({ owner: user._id });
-        // if there is not any tasks return
-        if (!getTasks) {
-            return res.status(404).send({ "Error": "Not Tasks" });
-        }
-        // if tasks returns
-        res.status(200).send(getTasks);
+        res.status(201).send(saveTask);
     }
     catch (e) {
         res.status(400).send(e);
     }
 });
+
+// ------------------------ GET THE TASKS ----------------------------------
+route.get("/tasks", Auth, async (req, res) => {
+    const user = req.user;
+    const searchQuery = req.query;
+    const match = {};
+    const sort = {};
+
+    if(searchQuery.completed){
+        match.completed = searchQuery.completed == "true"
+    }
+
+    if(searchQuery.sort){
+        const parts = req.query.sort.split(':');
+        sort[parts[0]] = parts[1] === 'desc' ? -1 : 1
+    }
+
+    try {
+        await user.populate({
+            path:"tasks",
+            match,
+            options:{
+                sort:sort,
+                limit:parseInt(req.query.limit),
+                skip:parseInt(req.query.skip)
+            }
+        });
+        // if tasks returns
+        res.status(200).send(user.tasks);
+    }
+    catch (e) {
+        res.status(400).send(e);
+    }
+});
+
+route.get("/tasks/:id", Auth, async (req, res) => {
+    try {
+        const user = req.user;
+        const id = req.params.id;
+        // get the tasks by using its owner property
+        const getTasks = await Task.findOne({ _id:id,owner: user._id });
+        // if there is not any tasks return
+        if (!getTasks) {
+           throw "Task not found"
+        }
+        // if tasks returns
+        res.status(200).send(getTasks);
+       
+    }
+    catch (e) {
+        res.status(400).send(e);
+    }
+});
+
+
 
 // ------------------------- UPDATE TASK -----------------------------------------
 route.patch("/tasks/:id", Auth, async (req, res) => {
@@ -70,11 +104,13 @@ route.patch("/tasks/:id", Auth, async (req, res) => {
         const user = req.user;
         const updateTaskId = req.params.id;
 
-        const getTasks = await Task.findById({ _id: updateTaskId });
+        const getTasks = await Task.find({ _id: updateTaskId,owner:user._id});
         // if task is not found
-        if (!getTasks) {
-            return res.status(404).send({ "Error": "No Task Found" });
+    
+        if (getTasks == []) {
+          throw new Error("Task is not found !");
         }
+
         // if taks is found then update the task
         keys.forEach((k) => {
             getTasks[k] = req.body[k];
@@ -86,7 +122,7 @@ route.patch("/tasks/:id", Auth, async (req, res) => {
 
     }
     catch (e) {
-        res.status(400).send(e);
+        res.status(400).send(e.message);
     }
 });
 
@@ -96,10 +132,10 @@ route.delete("/tasks/:id", Auth, async (req, res) => {
         const user = req.user;
         const taskId = req.params.id;
 
-        const getTasks = await Task.findByIdAndDelete({ _id: taskId });
+        const getTasks = await Task.deleteOne({ _id: taskId,owner:user._id});
         // if tasks is not found
         if (!getTasks) {
-            return res.status(404).send({ "Error": "No Task Found" });
+            return res.status(401).send({ "Error": "No Task Found" });
         }
         // if task is found
         res.status(200).send(getTasks);

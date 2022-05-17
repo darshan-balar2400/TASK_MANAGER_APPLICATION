@@ -10,21 +10,23 @@ route.get("/",(req,res) => {
 });
 
 // ------------------------------- CREATE THE USER --------------------------------
+
 route.post("/users",async(req,res) => {
     try{
         const user = req.body;
         // if user data is provided
         if(!user){
-            return res.status(404).send({"Error":"Please Enter Required Information for signup"});
+            res.status(404).send({"Error":"Please Enter Required Information for signup"});
         }
         // if user data is not provided
         const newUser = new User(user);
+        // console.log(newUser);
         const userToken = await newUser.generateAuthToken();
 
         res.status(201).send({newUser,userToken});
     }
     catch(e){
-        res.status(400).send({"Error":`${e}`});
+        res.status(400).send(e.message);
     }
 });
 
@@ -40,7 +42,6 @@ route.post("/users/login",async(req,res) => {
         }
         // if user provides password and email then go further for checking in databases
         const checkCredentials = await User.checkCredentials(email,password);
-        console.log(checkCredentials);
         //  generate the token for user
         const token = await checkCredentials.generateAuthToken();
 
@@ -93,7 +94,7 @@ route.get("/users",Auth,async(req,res) => {
     // show user data with the tasks that their created 
     const userData = await User.findOne({_id:req.user._id}).populate("tasks");
     const tasks = userData.tasks;
-    res.status(200).send(userData);
+    res.status(200).send({userData,tasks});
 });
 
 // ------------------------------- UPDATE USER -----------------------------
@@ -107,7 +108,7 @@ route.patch("/users",Auth,async(req,res) => {
 
     // if is is not valid
     if(!isValid){
-        return res.status(404).send({"Error":"Filed is not valid ! "});
+        return res.status(400).send({"Error":"Filed is not valid ! "});
     }
 
     // if it is valid
@@ -120,11 +121,14 @@ route.patch("/users",Auth,async(req,res) => {
         });
 
         // save the data into the database
-        await user.save();
-        res.status(200).send(user);
+        const saveUser = await user.save();
+        if(!saveUser){
+            res.status(400).send("Bad Request ")
+        }
+        res.status(200).send(saveUser);
     }
     catch(e){
-        res.status(500).send(e);
+        res.status(400).send(e);
     }
 });
 
@@ -165,7 +169,7 @@ route.post("/users/me/avatar",Auth,upload.single("avatar"),async(req,res) => {
 
         req.user.avatar = buffer;
         await req.user.save();
-        res.send(req.user);
+        res.status(200).send(req.user);
     }
     catch(e){res.status(400).send(e)}
 
